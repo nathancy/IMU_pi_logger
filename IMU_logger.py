@@ -41,11 +41,13 @@ class IMULogger(object):
                 if char.isdigit():
                     s += char
             return int(s)
-
+        
         l = [extract_digits(filename) for filename in os.listdir(self.path)]
-        latest_file_number = max(l)
-        self.filename = 'IMU' + '{0:04d}'.format(latest_file_number + 1) + '.log'
-        return self.filename
+        if not l:
+            return 'IMU0000.log'
+        else:
+            latest_file_number = max(l)
+            return 'IMU' + '{0:04d}'.format(latest_file_number + 1) + '.log'
                     
     def start(self):
         while True:
