@@ -8,19 +8,16 @@ class IMULogger(object):
         self.initialize_IMU_serial_port()
         self.start()
 
-        print(len('$VNACC,+00.105,-00.250,-10.148*4F'))
-
     def initialize_logger_settings(self):
         
         self.initialize_log_directory()
         logging.basicConfig(filename= self.path + self.filename, 
                             filemode='w', 
                             level=logging.INFO, 
-                            format='%(asctime)s,%(message)s', 
+                            format='%(asctime)s.%(msecs)03d,%(message)s',
                             datefmt='%d-%b-%y,%H:%M:%S')
         logging.info('Successfully loaded logger configuration settings')
         
-        exit(1)
     def initialize_IMU_serial_port(self):
         self.ser = serial.Serial('/dev/ttyUSB0')
         self.ser.baudrate = 230400
@@ -43,18 +40,19 @@ class IMULogger(object):
             return int(s)
         
         l = [extract_digits(filename) for filename in os.listdir(self.path)]
+        # Directory is empty
         if not l:
             return 'IMU0000.log'
+        # Directory has files so find latest
         else:
             latest_file_number = max(l)
             return 'IMU' + '{0:04d}'.format(latest_file_number + 1) + '.log'
                     
     def start(self):
         while True:
-            s = self.ser.readline()
-            print(s)
-            print(len(s))
+            data = self.ser.readline().rstrip()
+            if data[:6] == '$VNACC' and len(data) == 33:
+                logging.info(data)
             
-
 if __name__ == '__main__':
     logger = IMULogger()
