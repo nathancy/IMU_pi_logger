@@ -1,14 +1,20 @@
 import logging
 import serial
 import os
+import RPi.GPIO as GPIO
+import time
 
 class IMULogger(object):
+    """Logs Vectornav VN-200 IMU serial data"""
+
     def __init__(self):
         self.initialize_logger_settings()
         self.initialize_IMU_serial_port()
+        self.initialize_LED()
         self.start()
 
     def initialize_logger_settings(self):
+        """Set logger configuration settings"""
         
         self.initialize_log_directory()
         logging.basicConfig(filename= self.path + self.filename, 
@@ -17,12 +23,24 @@ class IMULogger(object):
                             format='%(asctime)s.%(msecs)03d,%(message)s',
                             datefmt='%d-%b-%y,%H:%M:%S')
         logging.info('Successfully loaded logger configuration settings')
+        self.status = True
+
+    def initialize_LED(self):
+        """Set GPIO settings"""
+
+        self.LED_PIN = 40
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(self.LED_PIN, GPIO.OUT, initial=GPIO.LOW)
         
     def initialize_IMU_serial_port(self):
+        """Connect to IMU serial port"""
+
         self.ser = serial.Serial('/dev/ttyUSB0')
         self.ser.baudrate = 230400
 
     def initialize_log_directory(self):
+        """Create IMU directory and IMU file"""
+
         self.path = '/home/pi/IMU_pi_logger/logs/'
 
         if not os.path.exists(self.path):
@@ -32,6 +50,8 @@ class IMULogger(object):
             self.filename = self.get_next_log_file_name()
 
     def get_next_log_file_name(self):
+        """Scans log directory for latest log file and returns a new filename"""
+
         def extract_digits(filename):
             s = ''
             for char in filename:
@@ -49,10 +69,21 @@ class IMULogger(object):
             return 'IMU' + '{0:04d}'.format(latest_file_number + 1) + '.log'
                     
     def start(self):
-        while True:
-            data = self.ser.readline().rstrip()
-            if data[:6] == '$VNACC' and len(data) == 33:
-                logging.info(data)
+        """Set status LED and start logger"""
+
+        try:
+            GPIO.output(self.LED_PIN, GPIO.HIGH)
+            while True:
+                data = self.ser.readline().rstrip()
+                if data[:6] == '$VNACC' and len(data) == 33:
+                    logging.info(data)
+        except KeyboardInterrupt:
+            logging.info('ERROR: KeyboardInterrupt')
+        except Exception as e:
+            logging.info('ERROR: ' + str(e))
+        finally:
+            logging.info('Cleanup')
+            GPIO.cleanup()
             
 if __name__ == '__main__':
     logger = IMULogger()
