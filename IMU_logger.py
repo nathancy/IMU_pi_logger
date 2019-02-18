@@ -9,8 +9,8 @@ class IMULogger(object):
 
     def __init__(self):
         self.initialize_logger_settings()
-        self.initialize_IMU_serial_port()
         self.initialize_LED()
+        self.initialize_IMU_serial_port()
         self.start()
 
     def initialize_logger_settings(self):
@@ -23,7 +23,6 @@ class IMULogger(object):
                             format='%(asctime)s.%(msecs)03d,%(message)s',
                             datefmt='%d-%b-%y,%H:%M:%S')
         logging.info('Successfully loaded logger configuration settings')
-        self.status = True
 
     def initialize_LED(self):
         """Set GPIO settings"""
@@ -34,9 +33,19 @@ class IMULogger(object):
         
     def initialize_IMU_serial_port(self):
         """Connect to IMU serial port"""
-
-        self.ser = serial.Serial('/dev/ttyUSB0')
-        self.ser.baudrate = 230400
+        
+        try:
+            try:
+                logging.info('Attempting to connect to /dev/ttyUSB0')
+                self.ser = serial.Serial('/dev/ttyUSB0')
+            except:
+                logging.info('Attempting to connect to /dev/ttyUSB1')
+                self.ser = serial.Serial('/dev/ttyUSB1')
+            self.ser.timeout = 5
+            self.ser.baudrate = 230400
+            return True
+        except:
+            return False
 
     def initialize_log_directory(self):
         """Create IMU directory and IMU file"""
@@ -70,20 +79,38 @@ class IMULogger(object):
                     
     def start(self):
         """Set status LED and start logger"""
-
-        try:
-            GPIO.output(self.LED_PIN, GPIO.HIGH)
-            while True:
-                data = self.ser.readline().rstrip()
-                if data[:6] == '$VNACC' and len(data) == 33:
-                    logging.info(data)
-        except KeyboardInterrupt:
-            logging.info('ERROR: KeyboardInterrupt')
-        except Exception as e:
-            logging.info('ERROR: ' + str(e))
-        finally:
-            logging.info('Cleanup')
-            GPIO.cleanup()
+        
+        while True:
+            try:
+                while True:
+                    data = self.ser.readline().rstrip()
+                    if not data:
+                        GPIO.output(self.LED_PIN, GPIO.LOW)
+                    else:
+                        GPIO.output(self.LED_PIN, GPIO.HIGH)
+                        print(data)
+                        if data[:6] == '$VNACC' and len(data) == 33:
+                            logging.info(data)
+            except KeyboardInterrupt:
+                logging.info('ERROR: KeyboardInterrupt')
+            except Exception as e:
+                print("unplugged")
+                logging.info('ERROR: ' + str(e))
+                self.ser.close()
+                while not self.initialize_IMU_serial_port():
+                    print('trying to reconnect')
+                    self.initialize_LED()
+                    self.restart = True
+                    GPIO.output(self.LED_PIN, GPIO.HIGH)
+                    time.sleep(1)
+                    GPIO.output(self.LED_PIN, GPIO.LOW)
+                    time.sleep(1)
+            finally:
+                logging.info('Cleanup')
+                GPIO.cleanup()
+                if self.restart:
+                    self.initialize_LED()
+                    self.restart = False
             
 if __name__ == '__main__':
     logger = IMULogger()
