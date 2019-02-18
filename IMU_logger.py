@@ -23,6 +23,17 @@ class IMULogger(object):
                             format='%(asctime)s.%(msecs)03d,%(message)s',
                             datefmt='%d-%b-%y,%H:%M:%S')
         logging.info('Successfully loaded logger configuration settings')
+    
+    def initialize_log_directory(self):
+        """Create IMU directory and IMU file"""
+
+        self.path = '/home/pi/IMU_pi_logger/logs/'
+
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+            self.filename = 'IMU0000.log'
+        else:
+            self.filename = self.get_next_log_file_name()
 
     def initialize_LED(self):
         """Set GPIO settings"""
@@ -34,29 +45,21 @@ class IMULogger(object):
     def initialize_IMU_serial_port(self):
         """Connect to IMU serial port"""
         
-        try:
-            try:
-                logging.info('Attempting to connect to /dev/ttyUSB0')
-                self.ser = serial.Serial('/dev/ttyUSB0')
-            except:
-                logging.info('Attempting to connect to /dev/ttyUSB1')
-                self.ser = serial.Serial('/dev/ttyUSB1')
-            self.ser.timeout = 5
-            self.ser.baudrate = 230400
-            return True
-        except:
+        self.dev_ports = ['/dev/' + f for f in os.listdir('/dev') if 'ttyUSB' in f]
+        if not self.dev_ports:
             return False
 
-    def initialize_log_directory(self):
-        """Create IMU directory and IMU file"""
-
-        self.path = '/home/pi/IMU_pi_logger/logs/'
-
-        if not os.path.exists(self.path):
-            os.makedirs(self.path)
-            self.filename = 'IMU0000.log'
-        else:
-            self.filename = self.get_next_log_file_name()
+        for port in self.dev_ports:
+            try:
+                logging.info('Attempting to connect to {}'.format(port))
+                self.ser = serial.Serial(port)
+                self.ser.timeout = 5
+                self.ser.baudrate = 230400
+                logging.info('Successfully connected to {}'.format(port))
+                return True
+            except serial.serialutil.SerialException:
+                logging.info('Failed to connect to {}'.format(port))
+                pass
 
     def get_next_log_file_name(self):
         """Scans log directory for latest log file and returns a new filename"""
