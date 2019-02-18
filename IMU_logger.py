@@ -9,8 +9,6 @@ class IMULogger(object):
 
     def __init__(self):
         self.initialize_logger_settings()
-        self.initialize_LED()
-        self.initialize_IMU_serial_port()
         self.start()
 
     def initialize_logger_settings(self):
@@ -79,12 +77,68 @@ class IMULogger(object):
         else:
             latest_file_number = max(l)
             return 'IMU' + '{0:04d}'.format(latest_file_number + 1) + '.log'
-                    
+    
+    def blink_LED(self):
+        GPIO.output(self.LED_PIN, GPIO.HIGH)
+        time.sleep(1)
+        GPIO.output(self.LED_PIN, GPIO.LOW)
+        time.sleep(1)
+
+    def log_data(self):
+        data = self.ser.readline().rstrip()
+        if not data:
+            GPIO.output(self.LED_PIN, GPIO.LOW)
+        else:
+            GPIO.output(self.LED_PIN, GPIO.HIGH)
+            print(data)
+            if data[:6] == '$VNACC' and len(data) == 33:
+                logging.info(data)
+
     def start(self):
         """Set status LED and start logger"""
-        
+       
         while True:
             try:
+                self.initialize_LED()
+                while not self.initialize_IMU_serial_port():
+                    logging.info('Attempting to connect...')
+                    self.initialize_LED()
+                    self.blink_LED()
+                while True:
+                    self.log_data()
+            except KeyboardInterrupt:
+                logging.info('ERROR: KeyboardInterrupt')
+                logging.info('Cleanup GPIO ports')
+                GPIO.cleanup()
+                exit(1)
+            except Exception as e:
+                logging.info('IMU unplugged/disconnected')
+                logging.info('ERROR: ' + str(e))
+                self.ser.close()
+                while not self.initialize_IMU_serial_port():
+                    logging.info('Attempting to connect...')
+                    self.initialize_LED()
+                    self.blink_LED()
+            GPIO.cleanup()
+
+        
+        '''
+
+
+
+
+
+
+
+
+
+
+
+
+        while True:
+            try:
+                self.initialize_LED()
+                self.initialize_IMU_serial_port()
                 while True:
                     data = self.ser.readline().rstrip()
                     if not data:
@@ -114,6 +168,7 @@ class IMULogger(object):
                 if self.restart:
                     self.initialize_LED()
                     self.restart = False
+        '''
             
 if __name__ == '__main__':
     logger = IMULogger()
