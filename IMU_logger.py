@@ -46,7 +46,7 @@ class IMULogger(object):
         Scans dev directory for USB ports and attempts to connect to serial port
         """
         
-        self.dev_ports = ['/dev/' + f for f in os.listdir('/dev') if 'ttyUSB' in f]
+        self.dev_ports = ['/dev/' + f for f in os.listdir('/dev') if 'ttyAMA' in f]
         if not self.dev_ports:
             return False
 
@@ -99,7 +99,7 @@ class IMULogger(object):
             GPIO.output(self.LED_PIN, GPIO.LOW)
         else:
             GPIO.output(self.LED_PIN, GPIO.HIGH)
-            #print(data)
+            # print(data)
             if data[:6] == '$VNACC' and len(data) == 33:
                 logging.info(data)
 
